@@ -1760,12 +1760,42 @@ function createMethaneSourceInventoryItems() {
   return items;
 }
 
+function createHonoInventoryItems() {
+  const year = "2016";
+  const name = "2016(1).tif";
+
+  return [{
+    id: "HONO-2016",
+    dataType: "emission",
+    datasetKey: "agriculture_emission",
+    datasetName: "农业排放清单",
+    name,
+    year,
+    mainCategory: "HONO排放清单",
+    sector: "",
+    category: "",
+    subCategory: "HONO",
+    pollutant: "HONO",
+    subject: "HONO",
+    period: rasterInventoryConfig.annualPeriod,
+    scale: "annual",
+    extension: "TIF",
+    path: `${API_BASE_URL}/api/downloads/emission/file?pollutant=HONO&year=${encodeURIComponent(year)}&category=${encodeURIComponent("时间分解")}&filename=${encodeURIComponent(name)}`,
+    size: 704550,
+    createdAt: `${year}-01-15`,
+    updatedAt: `${year}-12-31`,
+    downloadCount: 0,
+    source: "static"
+  }];
+}
+
 function createRasterInventoryItems() {
   return [
     ...createRasterInventoryItemsForPollutant("NH3", "NH3排放清单"),
     ...createPlantingInventoryItemsForPollutant("NH3", "NH3排放清单"),
     ...createMethaneSourceInventoryItems(),
     ...createRasterInventoryItemsForPollutant("NOx", "NOx排放清单"),
+    ...createHonoInventoryItems(),
     ...createPassengerCarInventoryItems()
   ];
 }
