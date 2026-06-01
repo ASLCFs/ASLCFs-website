@@ -1088,8 +1088,7 @@ body[data-page="about"] .content-section:first-of-type .section-header p {
 }
 
 .team-card img.team-photo-liaohong {
-  object-position: 50% 17%;
-  transform: scale(1.95);
+  object-position: 50% 16%;
 }
 
 .team-card h3 {
