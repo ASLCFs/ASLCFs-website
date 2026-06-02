@@ -12,8 +12,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" />
 
-  <link rel="stylesheet" href="styles-modern.css?v=20260602c" />
-  <script src="script.js?v=20260602c" defer></script>
+  <link rel="stylesheet" href="styles-modern.css?v=20260602d" />
+  <script src="script.js?v=20260602d" defer></script>
 </head>
 <body data-page="home">
   <div class="page-shell">
@@ -51,12 +51,30 @@
         </div>
 
         <div class="hero-visual">
-          <div class="floating-card">
-            <p class="card-kicker">Live Focus</p>
-            <p class="card-title" id="newsTitle">最新动态</p>
-            <p id="newsText">排放数据样例已更新，支持在线浏览与下载。</p>
-            <div class="sector-tags">
-              <span class="sector-tag active" data-sector="emission">排放数据</span>
+          <div class="floating-card home-news-card" id="homeNewsCarousel">
+            <div class="home-news-media">
+              <img src="assets/home-news/livestock-ch4-total.jpg" alt="2023年畜牧业CH4排放空间分布图" class="home-news-image is-active" data-news-index="0" />
+              <img src="assets/home-news/livestock-nh3-species.jpg" alt="2023年畜牧业NH3排放空间分布图" class="home-news-image" data-news-index="1" />
+              <img src="assets/home-news/planting-ch4.jpg" alt="2023年种植业CH4排放空间分布图" class="home-news-image" data-news-index="2" />
+              <img src="assets/home-news/livestock-nox-species.jpg" alt="2023年畜牧业NOx排放空间分布图" class="home-news-image" data-news-index="3" />
+              <img src="assets/home-news/planting-nh3-crops.jpg" alt="2023年种植业NH3排放空间分布图" class="home-news-image" data-news-index="4" />
+            </div>
+            <div class="home-news-content">
+              <p class="card-kicker">Live Focus</p>
+              <p class="card-title" id="newsTitle">最新动态</p>
+              <p id="newsText">排放数据样例已更新，支持在线浏览与下载。</p>
+              <a href="resources.html" class="button primary home-news-link">排放数据</a>
+            </div>
+            <div class="home-news-controls" aria-label="最新动态图片轮播">
+              <button type="button" class="home-news-arrow" data-news-action="prev" aria-label="上一张">‹</button>
+              <div class="home-news-dots">
+                <button type="button" class="home-news-dot is-active" data-news-dot="0" aria-label="第 1 张"></button>
+                <button type="button" class="home-news-dot" data-news-dot="1" aria-label="第 2 张"></button>
+                <button type="button" class="home-news-dot" data-news-dot="2" aria-label="第 3 张"></button>
+                <button type="button" class="home-news-dot" data-news-dot="3" aria-label="第 4 张"></button>
+                <button type="button" class="home-news-dot" data-news-dot="4" aria-label="第 5 张"></button>
+              </div>
+              <button type="button" class="home-news-arrow" data-news-action="next" aria-label="下一张">›</button>
             </div>
           </div>
         </div>
@@ -67,6 +85,7 @@
   </div>
 </body>
 </html>
+
 
 
 

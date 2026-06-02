@@ -3338,6 +3338,92 @@ function initializeSectorTags() {
   }
 }
 
+function initializeHomeNewsCarousel() {
+  const carousel = document.getElementById("homeNewsCarousel");
+  if (!carousel) return;
+
+  const images = Array.from(carousel.querySelectorAll(".home-news-image"));
+  const dots = Array.from(carousel.querySelectorAll(".home-news-dot"));
+  const prevButton = carousel.querySelector('[data-news-action="prev"]');
+  const nextButton = carousel.querySelector('[data-news-action="next"]');
+  const title = document.getElementById("newsTitle");
+  const text = document.getElementById("newsText");
+
+  const slides = [
+    {
+      title: "2023 年畜牧业 CH4 排放空间分布",
+      text: "展示畜牧业甲烷排放格局与年度变化趋势。"
+    },
+    {
+      title: "2023 年畜牧业 NH3 排放空间分布",
+      text: "展示不同畜禽物种 NH3 排放贡献。"
+    },
+    {
+      title: "2023 年种植业 CH4 排放空间分布",
+      text: "展示水稻等种植活动甲烷排放变化。"
+    },
+    {
+      title: "2023 年畜牧业 NOx 排放空间分布",
+      text: "展示不同畜禽物种 NOx 排放贡献。"
+    },
+    {
+      title: "2023 年种植业 NH3 排放空间分布",
+      text: "展示主要作物 NH3 排放空间格局。"
+    }
+  ];
+
+  if (!images.length) return;
+
+  let activeIndex = 0;
+  let timer = null;
+
+  const setSlide = (index) => {
+    activeIndex = (index + images.length) % images.length;
+    images.forEach((image, imageIndex) => {
+      image.classList.toggle("is-active", imageIndex === activeIndex);
+    });
+    dots.forEach((dot, dotIndex) => {
+      dot.classList.toggle("is-active", dotIndex === activeIndex);
+    });
+
+    const slide = slides[activeIndex] || slides[0];
+    if (title) title.textContent = slide.title;
+    if (text) text.textContent = slide.text;
+  };
+
+  const start = () => {
+    window.clearInterval(timer);
+    timer = window.setInterval(() => setSlide(activeIndex + 1), 4500);
+  };
+
+  const stop = () => {
+    window.clearInterval(timer);
+  };
+
+  dots.forEach((dot) => {
+    dot.addEventListener("click", () => {
+      setSlide(Number(dot.dataset.newsDot || 0));
+      start();
+    });
+  });
+
+  prevButton?.addEventListener("click", () => {
+    setSlide(activeIndex - 1);
+    start();
+  });
+
+  nextButton?.addEventListener("click", () => {
+    setSlide(activeIndex + 1);
+    start();
+  });
+
+  carousel.addEventListener("mouseenter", stop);
+  carousel.addEventListener("mouseleave", start);
+
+  setSlide(0);
+  start();
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   renderSharedLayout();
   initializeLanguageSelector();
@@ -3348,6 +3434,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initializeAdmin();
   revealAdminLink();
   initializeSectorTags();
+  initializeHomeNewsCarousel();
   const savedLanguage = localStorage.getItem("pageLanguage") || "zh";
   setLanguage(savedLanguage);
   updateVisitStats();

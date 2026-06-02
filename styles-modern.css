@@ -509,6 +509,108 @@ body {
   animation: float 6s ease-in-out infinite;
 }
 
+.home-news-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(220px, 0.75fr);
+  gap: 22px;
+  width: min(760px, 92vw);
+  max-width: 760px;
+  padding: 18px;
+  overflow: hidden;
+}
+
+.home-news-media {
+  position: relative;
+  min-height: 260px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+}
+
+.home-news-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transform: scale(1.03);
+  transition: opacity 0.6s ease, transform 0.8s ease;
+}
+
+.home-news-image.is-active {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.home-news-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+
+.home-news-content .card-title {
+  margin-bottom: 10px;
+}
+
+.home-news-content #newsText {
+  margin-bottom: 18px;
+}
+
+.home-news-link {
+  width: fit-content;
+}
+
+.home-news-controls {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.home-news-arrow,
+.home-news-dot {
+  border: 0;
+  cursor: pointer;
+}
+
+.home-news-arrow {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.home-news-arrow:hover {
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+.home-news-dots {
+  display: flex;
+  gap: 8px;
+}
+
+.home-news-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  padding: 0;
+}
+
+.home-news-dot.is-active {
+  width: 24px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
 @keyframes float {
   0%, 100% {
     transform: translate(-50%, -50%);
@@ -3261,6 +3363,25 @@ body[data-page="admin"] .button.danger:hover {
 
 /* 响应式设计 */
 @media (max-width: 768px) {
+  .home-news-card {
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none;
+    grid-template-columns: 1fr;
+    width: 100%;
+    padding: 14px;
+    animation: none;
+  }
+
+  .home-news-media {
+    min-height: 190px;
+  }
+
+  .home-news-content {
+    align-items: flex-start;
+  }
+
   body[data-page="admin"] .page-main {
     padding: var(--space-md);
   }
