@@ -2482,6 +2482,7 @@ function initializeDownloadsPage() {
   const categoryTime = document.getElementById('categoryTime');
   const categorySpecies = document.getElementById('categorySpecies');
   const timeSubjectSection = document.getElementById('timeSubjectSection');
+  const timeSubjectOptions = timeSubjectSection?.querySelector('.filter-options');
   const speciesSubjectSection = document.getElementById('speciesSubjectSection');
   const cropSubjectSection = document.getElementById('cropSubjectSection');
   const methaneSubjectSection = document.getElementById('methaneSubjectSection');
@@ -2530,7 +2531,7 @@ function initializeDownloadsPage() {
 
   const renderDownloadSectorOptions = (mainCategory) => {
     if (!sectorOptions || !sectorSection) return;
-    if (mainCategory === "CH4排放清单") {
+    if (mainCategory === "CH4排放清单" || mainCategory === "HONO排放清单") {
       sectorSection.style.display = "none";
       sectorOptions.innerHTML = "";
       return;
@@ -2551,6 +2552,17 @@ function initializeDownloadsPage() {
     `).join("");
   };
 
+  const renderDownloadTimeSubjectOptions = (mainCategory) => {
+    if (!timeSubjectOptions) return;
+    const options = mainCategory === "HONO排放清单"
+      ? [{ value: "HONO", label: "HONO" }]
+      : [{ value: "livestock", label: "畜禽总量" }];
+
+    timeSubjectOptions.innerHTML = options.map((option, index) => `
+      <label><input type="radio" name="timeSubject" value="${option.value}" ${index === 0 ? "checked" : ""} /> ${option.label}</label>
+    `).join("");
+  };
+
   const updateDownloadSubjectSections = () => {
     const category = getCheckedValue("category");
     if (timeSubjectSection) timeSubjectSection.style.display = category === "时间分解" ? "block" : "none";
@@ -2564,9 +2576,12 @@ function initializeDownloadsPage() {
     if ((getCheckedValue("datasetKey") || "agriculture_emission") === "other_emission") return;
     const mainCategory = getCheckedValue("mainCategory") || "NH3排放清单";
     renderDownloadSectorOptions(mainCategory);
+    renderDownloadTimeSubjectOptions(mainCategory);
 
     if (mainCategory === "CH4排放清单") {
       renderDownloadCategoryOptions("methane");
+    } else if (mainCategory === "HONO排放清单") {
+      renderDownloadCategoryOptions("livestock");
     } else if (getCheckedValue("sector") === "种植业") {
       renderDownloadCategoryOptions("planting");
     } else {
@@ -2680,6 +2695,19 @@ async function handleEmissionDownload(event) {
 
   try {
     const token = getAuthToken();
+
+    if (mainCategory === "HONO排放清单") {
+      if (year !== "2016") {
+        throw new Error("HONO排放清单目前仅提供 2016 年数据。");
+      }
+
+      const honoUrl = `${API_BASE_URL}/api/downloads/emission/file?pollutant=HONO&year=2016&category=${encodeURIComponent("时间分解")}&filename=${encodeURIComponent("2016(1).tif")}`;
+      const downloaded = await downloadWithAuth(honoUrl, "2016(1).tif");
+      if (downloaded) {
+        showMatchResult("HONO 文件已开始下载。", "success");
+      }
+      return;
+    }
 
     const filters = {
       pollutant: getPollutantFromMainCategory(mainCategory),
