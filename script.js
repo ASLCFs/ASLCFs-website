@@ -29,6 +29,17 @@
 
 const ADVISOR_REQUIRED_TITLES = ["undergraduate", "master", "doctoral", "postdoc"];
 
+const EXPRESS_DELIVERY_ZENODO_FILE = {
+  filename: "快递业道路尺度排放清单.zip",
+  zenodoUrl: "https://zenodo.org/records/20528292/files/%E5%BF%AB%E9%80%92%E4%B8%9A%E9%81%93%E8%B7%AF%E5%B0%BA%E5%BA%A6%E6%8E%92%E6%94%BE%E6%B8%85%E5%8D%95.zip?download=1",
+  datasetKey: "other_emission",
+  datasetName: "其他排放清单",
+  mainCategory: "快递业道路尺度排放清单",
+  subject: "快递业",
+  scale: "zip",
+  fileCount: 1
+};
+
 const PUBLIC_EMAIL_DOMAINS = [
   "qq.com",
   "163.com",
@@ -2499,13 +2510,16 @@ function initializeDownloadsPage() {
   // 分类变化时显示/隐藏对应的对象选择区域
   const mainCategoryRadios = document.querySelectorAll('input[name="mainCategory"]');
   const datasetRadios = document.querySelectorAll('input[name="datasetKey"]');
+  const otherMainCategoryRadios = document.querySelectorAll('input[name="otherMainCategory"]');
   const agricultureFields = document.querySelectorAll('.agriculture-download-field');
   const otherFields = [
     document.getElementById('otherEmissionSection'),
-    document.getElementById('otherPendingSection'),
     document.getElementById('otherPollutantSection'),
     document.getElementById('otherPeriodSection')
   ].filter(Boolean);
+  const otherPendingSection = document.getElementById('otherPendingSection');
+  const otherPollutantSection = document.getElementById('otherPollutantSection');
+  const otherPeriodSection = document.getElementById('otherPeriodSection');
   const yearSection = document.getElementById('yearSection');
   const sectorSection = document.getElementById('sectorSection');
   const sectorOptions = document.getElementById('sectorOptions');
@@ -2588,7 +2602,28 @@ function initializeDownloadsPage() {
     otherFields.forEach(field => {
       field.style.display = isOther ? "" : "none";
     });
+    updateOtherEmissionMode();
     updateDownloadFormOptions();
+  };
+
+  const updateOtherEmissionMode = () => {
+    const isOther = (getCheckedValue("datasetKey") || "agriculture_emission") === "other_emission";
+    const mainCategory = getCheckedValue("otherMainCategory") || "乘用车日尺度排放清单";
+    const isExpressDelivery = mainCategory === "快递业道路尺度排放清单";
+    const yearInputs = document.querySelectorAll('input[name="year"]');
+    const scaleInputs = document.querySelectorAll('input[name="scale"]');
+
+    if (yearSection) yearSection.style.display = isOther && isExpressDelivery ? "none" : "";
+    if (scaleSection) scaleSection.style.display = isOther && isExpressDelivery ? "none" : "";
+    yearInputs.forEach(input => {
+      input.disabled = isOther && isExpressDelivery;
+    });
+    scaleInputs.forEach(input => {
+      input.disabled = isOther && isExpressDelivery;
+    });
+    if (otherPendingSection) otherPendingSection.style.display = isOther && isExpressDelivery ? "" : "none";
+    if (otherPollutantSection) otherPollutantSection.style.display = isOther && !isExpressDelivery ? "" : "none";
+    if (otherPeriodSection) otherPeriodSection.style.display = isOther && !isExpressDelivery ? "" : "none";
   };
 
   const renderDownloadCategoryOptions = (mode) => {
@@ -2702,6 +2737,9 @@ function initializeDownloadsPage() {
   });
   datasetRadios.forEach(radio => {
     radio.addEventListener('change', updateDownloadDatasetMode);
+  });
+  otherMainCategoryRadios.forEach(radio => {
+    radio.addEventListener('change', updateOtherEmissionMode);
   });
   if (sectorOptions) {
     sectorOptions.addEventListener('change', updateDownloadFormOptions);
@@ -2934,7 +2972,9 @@ async function recordZenodoDownloadRequest(file, filters) {
       filename: file.filename,
       zenodoUrl: file.zenodoUrl,
       filePath: file.zenodoUrl,
-      fileCount: 1,
+      datasetKey: file.datasetKey || filters.datasetKey || "agriculture_emission",
+      datasetName: file.datasetName || filters.datasetName || "农业排放清单",
+      fileCount: file.fileCount || 1,
       year: file.year || filters.year,
       mainCategory: file.mainCategory || filters.mainCategory,
       sector: file.sector || filters.sector,
@@ -2955,11 +2995,41 @@ async function recordZenodoDownloadRequest(file, filters) {
   }
 }
 
+async function recordExpressDeliveryDownloadRequest() {
+  await recordZenodoDownloadRequest(EXPRESS_DELIVERY_ZENODO_FILE, {
+    datasetKey: EXPRESS_DELIVERY_ZENODO_FILE.datasetKey,
+    datasetName: EXPRESS_DELIVERY_ZENODO_FILE.datasetName,
+    mainCategory: EXPRESS_DELIVERY_ZENODO_FILE.mainCategory,
+    subject: EXPRESS_DELIVERY_ZENODO_FILE.subject,
+    scale: EXPRESS_DELIVERY_ZENODO_FILE.scale
+  });
+}
+
 async function handleOtherEmissionDownload(event, formData) {
   const year = formData.get('year');
   const mainCategory = formData.get('otherMainCategory') || '乘用车日尺度排放清单';
   const pollutants = formData.getAll('otherPollutant');
   const periods = formData.getAll('otherPeriod');
+
+  if (mainCategory === '快递业道路尺度排放清单') {
+    const btn = event.target.querySelector('.download-btn');
+    const originalText = btn.textContent;
+    btn.textContent = '正在打开 Zenodo...';
+    btn.disabled = true;
+
+    try {
+      await recordExpressDeliveryDownloadRequest();
+      window.open(EXPRESS_DELIVERY_ZENODO_FILE.zenodoUrl, "_blank", "noopener");
+      showMatchResult("已记录下载申请，正在打开快递业道路尺度排放清单 zip 数据包。", "success");
+      renderDownloadHistory();
+    } catch (error) {
+      showMatchResult(`下载失败：${error.message}`, 'error');
+    } finally {
+      btn.textContent = originalText;
+      btn.disabled = false;
+    }
+    return;
+  }
 
   if (year !== '2019') {
     showMatchResult('乘用车日尺度排放清单当前仅支持 2019 年数据', 'error');
