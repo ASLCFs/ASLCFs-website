@@ -2993,6 +2993,11 @@ async function handleEmissionDownload(event) {
         });
         navigateDownloadWindow(popup, zenodoMatch.zenodoUrl);
       } catch (error) {
+        if (isDownloadRecordNetworkError(error)) {
+          navigateDownloadWindow(popup, zenodoMatch.zenodoUrl);
+          showMatchResult(`下载记录接口暂时不可用，已打开 Zenodo 文件：${zenodoMatch.filename}`, "warning");
+          return;
+        }
         showDownloadWindowError(popup, error.message, zenodoMatch.zenodoUrl, zenodoMatch.filename);
         throw error;
       }
@@ -3121,6 +3126,14 @@ async function recordZenodoDownloadRequest(file, filters) {
   }
 }
 
+function isDownloadRecordNetworkError(error) {
+  const message = String(error?.message || "");
+  return error instanceof TypeError
+    || /failed to fetch/i.test(message)
+    || /network\s*error/i.test(message)
+    || /load failed/i.test(message);
+}
+
 async function recordExpressDeliveryDownloadRequest() {
   await recordZenodoDownloadRequest(EXPRESS_DELIVERY_ZENODO_FILE, {
     datasetKey: EXPRESS_DELIVERY_ZENODO_FILE.datasetKey,
@@ -3153,6 +3166,11 @@ async function handleOtherEmissionDownload(event, formData) {
       showMatchResult("已记录下载申请，正在打开快递业道路尺度排放清单 zip 数据包。", "success");
       renderDownloadHistory();
     } catch (error) {
+      if (isDownloadRecordNetworkError(error)) {
+        navigateDownloadWindow(popup, EXPRESS_DELIVERY_ZENODO_FILE.zenodoUrl);
+        showMatchResult("下载记录接口暂时不可用，已打开快递业道路尺度排放清单 zip 数据包。", "warning");
+        return;
+      }
       showDownloadWindowError(
         popup,
         error.message,
