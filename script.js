@@ -2943,20 +2943,36 @@ function normalizeZenodoScale(scale) {
   return String(scale || "");
 }
 
+function getZenodoSubjectAliases(subject) {
+  const value = String(subject || "");
+  if (value === "甲烷总排放量") return ["甲烷总排放量", "总排放量"];
+  if (value === "总排放量") return ["总排放量", "甲烷总排放量"];
+  return [value];
+}
+
 async function findZenodoEmissionFile(filters) {
   const items = await loadZenodoFileIndex();
-  const subjects = Array.isArray(filters.subjects) ? filters.subjects : [];
+  const subjects = Array.isArray(filters.subjects)
+    ? filters.subjects.flatMap(getZenodoSubjectAliases)
+    : [];
+  const requestedScale = normalizeZenodoScale(filters.scale);
+  const scaleOrder = requestedScale === "all" ? ["annual", "monthly"] : [requestedScale];
 
-  return items.find(item => {
-    const samePollutant = item.pollutant === filters.pollutant;
-    const sameMainCategory = item.mainCategory === filters.mainCategory;
-    const sameSector = !item.sector || item.sector === filters.sector;
-    const sameCategory = !item.category || item.category === filters.category;
-    const sameYear = item.year === filters.year;
-    const sameScale = normalizeZenodoScale(filters.scale) !== "all" && item.scale === filters.scale;
-    const sameSubject = !item.subject || subjects.includes(item.subject);
-    return samePollutant && sameMainCategory && sameSector && sameCategory && sameYear && sameScale && sameSubject;
-  });
+  for (const scale of scaleOrder) {
+    const matched = items.find(item => {
+      const samePollutant = item.pollutant === filters.pollutant;
+      const sameMainCategory = item.mainCategory === filters.mainCategory;
+      const sameSector = !item.sector || item.sector === filters.sector;
+      const sameCategory = !item.category || item.category === filters.category;
+      const sameYear = item.year === filters.year;
+      const sameScale = item.scale === scale;
+      const sameSubject = !item.subject || subjects.includes(item.subject);
+      return samePollutant && sameMainCategory && sameSector && sameCategory && sameYear && sameScale && sameSubject;
+    });
+    if (matched) return matched;
+  }
+
+  return null;
 }
 
 async function recordZenodoDownloadRequest(file, filters) {
