@@ -2422,7 +2422,20 @@ function renderRasterInventory() {
               data-file-subject="${formatRasterSubject(item.subject)}"
               data-file-scale="${formatInventoryScale(item)}"
             >${text.versionInfo}</button>
-            <button type="button" class="inventory-table-btn" data-download-url="${item.path}" data-file-name="${item.name}">${text.download}</button>
+            <button
+              type="button"
+              class="inventory-table-btn"
+              data-open-download-center
+              data-download-dataset="${item.datasetKey || ""}"
+              data-download-main-category="${item.mainCategory || ""}"
+              data-download-sector="${item.sector || ""}"
+              data-download-category="${item.category || ""}"
+              data-download-subject="${item.subject || ""}"
+              data-download-pollutant="${item.pollutant || ""}"
+              data-download-year="${item.year || ""}"
+              data-download-scale="${item.scale || ""}"
+              data-download-period="${item.period || ""}"
+            >${text.download}</button>
           </div>
         </td>
       </tr>
@@ -2472,7 +2485,20 @@ function renderRasterInventory() {
         </div>
       </div>
       <div class="raster-card-actions">
-        <button type="button" class="button primary download-tif-btn" data-download-url="${item.path}" data-file-name="${item.name}">${text.download}</button>
+        <button
+          type="button"
+          class="button primary download-tif-btn"
+          data-open-download-center
+          data-download-dataset="${item.datasetKey || ""}"
+          data-download-main-category="${item.mainCategory || ""}"
+          data-download-sector="${item.sector || ""}"
+          data-download-category="${item.category || ""}"
+          data-download-subject="${item.subject || ""}"
+          data-download-pollutant="${item.pollutant || ""}"
+          data-download-year="${item.year || ""}"
+          data-download-scale="${item.scale || ""}"
+          data-download-period="${item.period || ""}"
+        >${text.download}</button>
       </div>
     </article>
   `).join("");
@@ -2556,6 +2582,79 @@ function initializeDownloadsPage() {
   };
 
   const getCheckedValue = (name) => document.querySelector(`input[name="${name}"]:checked`)?.value || "";
+
+  const setRadioValue = (name, value) => {
+    if (!value) return false;
+    const input = Array.from(document.querySelectorAll(`input[name="${name}"]`))
+      .find(item => item.value === value);
+    if (!input || input.disabled) return false;
+    input.checked = true;
+    return true;
+  };
+
+  const setCheckboxValue = (name, value) => {
+    if (!value) return false;
+    const input = Array.from(document.querySelectorAll(`input[name="${name}"]`))
+      .find(item => item.value === value);
+    if (!input || input.disabled) return false;
+    input.checked = true;
+    return true;
+  };
+
+  const applyDownloadParams = () => {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.size) return;
+
+    const dataset = params.get("dataset");
+    const mainCategory = params.get("mainCategory");
+    const sector = params.get("sector");
+    const category = params.get("category");
+    const subject = params.get("subject");
+    const pollutant = params.get("pollutant");
+    const year = params.get("year");
+    const scale = params.get("scale");
+    const period = params.get("period");
+
+    if (dataset) setRadioValue("datasetKey", dataset);
+    updateDownloadDatasetMode();
+
+    if (dataset === "other_emission") {
+      if (mainCategory === "乘用车日尺度排放清单") {
+        setRadioValue("otherMainCategory", mainCategory);
+        updateOtherEmissionMode();
+        if (pollutant) setCheckboxValue("otherPollutant", pollutant);
+        if (period) setCheckboxValue("otherPeriod", period);
+      } else if (subject === "快递业") {
+        setRadioValue("otherMainCategory", "快递业道路尺度排放清单");
+        updateOtherEmissionMode();
+      }
+      return;
+    }
+
+    if (mainCategory) setRadioValue("mainCategory", mainCategory);
+    updateDownloadFormOptions();
+    if (sector) setRadioValue("sector", sector);
+    updateDownloadFormOptions();
+    if (category) setRadioValue("category", category);
+    updateDownloadSubjectSections();
+    if (year) setRadioValue("year", year);
+    if (scale) setRadioValue("scale", scale);
+    updateDownloadMonthOptions();
+    if (period) setRadioValue("month", period);
+
+    if (category === "时间分解") {
+      setRadioValue("timeSubject", subject);
+    } else if (category === "物种分解") {
+      setCheckboxValue("species", subject);
+    } else if (category === "作物分解") {
+      setCheckboxValue("cropSubject", subject);
+    } else if (category === "甲烷来源分解") {
+      setCheckboxValue("methaneSubject", subject);
+    } else if (mainCategory === "HONO排放清单") {
+      setRadioValue("year", "2016");
+      setRadioValue("scale", "annual");
+    }
+  };
 
   const updateDownloadMonthOptions = () => {
     const datasetKey = getCheckedValue("datasetKey") || "agriculture_emission";
@@ -2776,6 +2875,7 @@ function initializeDownloadsPage() {
     scaleSection.addEventListener('change', updateDownloadMonthOptions);
   }
   updateDownloadDatasetMode();
+  applyDownloadParams();
 
   // Select All 功能
   const selectAllSpecies = document.getElementById('selectAllSpecies');
@@ -3214,6 +3314,28 @@ function showMatchResult(message, type = 'info') {
   }, 3000);
 }
 
+function buildDownloadCenterUrlFromInventory(button) {
+  const params = new URLSearchParams();
+  const fieldMap = {
+    dataset: "downloadDataset",
+    mainCategory: "downloadMainCategory",
+    sector: "downloadSector",
+    category: "downloadCategory",
+    subject: "downloadSubject",
+    pollutant: "downloadPollutant",
+    year: "downloadYear",
+    scale: "downloadScale",
+    period: "downloadPeriod"
+  };
+
+  Object.entries(fieldMap).forEach(([param, key]) => {
+    const value = button.dataset[key];
+    if (value) params.set(param, value);
+  });
+
+  return `downloads.html${params.toString() ? `?${params.toString()}` : ""}`;
+}
+
 function initializeRasterInventory() {
   const container = document.getElementById("rasterList");
   if (!container) return;
@@ -3438,6 +3560,12 @@ function initializeRasterInventory() {
   });
 
   container.addEventListener("click", (event) => {
+    const downloadCenterButton = event.target.closest("[data-open-download-center]");
+    if (downloadCenterButton) {
+      window.location.href = buildDownloadCenterUrlFromInventory(downloadCenterButton);
+      return;
+    }
+
     const downloadButton = event.target.closest("[data-download-url]");
     if (downloadButton) {
       downloadButton.disabled = true;
