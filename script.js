@@ -2537,6 +2537,7 @@ function initializeDownloadsPage() {
         input.checked = input.value === "annual";
         input.disabled = input.value !== "annual";
       } else {
+        input.checked = input.value === "all";
         input.disabled = false;
       }
     });
