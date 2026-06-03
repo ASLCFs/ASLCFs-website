@@ -2979,7 +2979,7 @@ async function handleEmissionDownload(event) {
     });
 
     if (zenodoMatch) {
-      const popup = createPendingDownloadWindow();
+      const popup = createPendingDownloadWindow(zenodoMatch.zenodoUrl, zenodoMatch.filename);
       try {
         await recordZenodoDownloadRequest(zenodoMatch, {
           pollutant: selectedPollutant,
@@ -2993,7 +2993,7 @@ async function handleEmissionDownload(event) {
         });
         navigateDownloadWindow(popup, zenodoMatch.zenodoUrl);
       } catch (error) {
-        if (popup && !popup.closed) popup.close();
+        showDownloadWindowError(popup, error.message, zenodoMatch.zenodoUrl, zenodoMatch.filename);
         throw error;
       }
       showMatchResult(`已记录下载申请，正在打开 Zenodo 文件：${zenodoMatch.filename}`, "success");
@@ -3142,7 +3142,10 @@ async function handleOtherEmissionDownload(event, formData) {
     const originalText = btn.textContent;
     btn.textContent = '正在打开 Zenodo...';
     btn.disabled = true;
-    const popup = createPendingDownloadWindow();
+    const popup = createPendingDownloadWindow(
+      EXPRESS_DELIVERY_ZENODO_FILE.zenodoUrl,
+      EXPRESS_DELIVERY_ZENODO_FILE.filename
+    );
 
     try {
       await recordExpressDeliveryDownloadRequest();
@@ -3150,7 +3153,12 @@ async function handleOtherEmissionDownload(event, formData) {
       showMatchResult("已记录下载申请，正在打开快递业道路尺度排放清单 zip 数据包。", "success");
       renderDownloadHistory();
     } catch (error) {
-      if (popup && !popup.closed) popup.close();
+      showDownloadWindowError(
+        popup,
+        error.message,
+        EXPRESS_DELIVERY_ZENODO_FILE.zenodoUrl,
+        EXPRESS_DELIVERY_ZENODO_FILE.filename
+      );
       showMatchResult(`下载失败：${error.message}`, 'error');
     } finally {
       btn.textContent = originalText;
@@ -3291,8 +3299,134 @@ function openDownloadWindow(url) {
   return false;
 }
 
-function createPendingDownloadWindow() {
-  return window.open("about:blank", "_blank");
+function escapeDownloadWindowHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function writeDownloadWindowContent(popup, { title, message, url, filename, status = "pending" }) {
+  if (!popup || popup.closed) return false;
+
+  const safeTitle = escapeDownloadWindowHtml(title);
+  const safeMessage = escapeDownloadWindowHtml(message);
+  const safeUrl = escapeDownloadWindowHtml(url);
+  const safeFilename = escapeDownloadWindowHtml(filename || "Zenodo data file");
+  const statusText = status === "error" ? "下载准备失败" : "正在准备下载";
+
+  try {
+    popup.document.open();
+    popup.document.write(`<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${safeTitle}</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+      color: #1f2933;
+      background: #f6f8fb;
+    }
+    main {
+      width: min(520px, calc(100vw - 32px));
+      padding: 32px;
+      border: 1px solid #d8e0ea;
+      border-radius: 8px;
+      background: #ffffff;
+      box-shadow: 0 16px 40px rgba(31, 41, 51, 0.08);
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-size: 22px;
+      font-weight: 650;
+    }
+    p {
+      margin: 0 0 14px;
+      line-height: 1.7;
+      color: #52606d;
+    }
+    .file {
+      margin: 18px 0;
+      padding: 12px 14px;
+      border-radius: 6px;
+      background: #f0f4f8;
+      color: #243b53;
+      word-break: break-all;
+      font-size: 14px;
+    }
+    a {
+      display: inline-block;
+      margin-top: 8px;
+      color: #0b5cab;
+      font-weight: 650;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 18px;
+      color: ${status === "error" ? "#b42318" : "#0967d2"};
+      font-size: 14px;
+      font-weight: 650;
+    }
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="status"><span class="dot"></span>${escapeDownloadWindowHtml(statusText)}</div>
+    <h1>${safeTitle}</h1>
+    <p>${safeMessage}</p>
+    <div class="file">${safeFilename}</div>
+    <p>如果页面没有自动跳转，可以点击下方链接打开 Zenodo 下载页面。</p>
+    <a href="${safeUrl}" rel="noopener">打开 Zenodo 下载链接</a>
+  </main>
+</body>
+</html>`);
+    popup.document.close();
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+function createPendingDownloadWindow(url, filename) {
+  const popup = window.open("about:blank", "_blank");
+  writeDownloadWindowContent(popup, {
+    title: "正在准备下载",
+    message: "系统正在记录下载申请，完成后会自动跳转到 Zenodo 文件页面。",
+    url,
+    filename
+  });
+  return popup;
+}
+
+function showDownloadWindowError(popup, message, url, filename) {
+  writeDownloadWindowContent(popup, {
+    title: "下载准备失败",
+    message: message || "记录下载申请时出现问题，请回到网站页面检查登录状态后重试。",
+    url,
+    filename,
+    status: "error"
+  });
 }
 
 function navigateDownloadWindow(popup, url) {
