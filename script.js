@@ -2979,17 +2979,23 @@ async function handleEmissionDownload(event) {
     });
 
     if (zenodoMatch) {
-      await recordZenodoDownloadRequest(zenodoMatch, {
-        pollutant: selectedPollutant,
-        mainCategory,
-        sector,
-        year,
-        category: selectedPollutant === "HONO" ? "" : category,
-        subjects: selectedPollutant === "HONO" ? ["HONO"] : subjects,
-        scale,
-        period
-      });
-      window.open(zenodoMatch.zenodoUrl, "_blank", "noopener");
+      const popup = createPendingDownloadWindow();
+      try {
+        await recordZenodoDownloadRequest(zenodoMatch, {
+          pollutant: selectedPollutant,
+          mainCategory,
+          sector,
+          year,
+          category: selectedPollutant === "HONO" ? "" : category,
+          subjects: selectedPollutant === "HONO" ? ["HONO"] : subjects,
+          scale,
+          period
+        });
+        navigateDownloadWindow(popup, zenodoMatch.zenodoUrl);
+      } catch (error) {
+        if (popup && !popup.closed) popup.close();
+        throw error;
+      }
       showMatchResult(`已记录下载申请，正在打开 Zenodo 文件：${zenodoMatch.filename}`, "success");
       renderDownloadHistory();
       return;
@@ -3008,49 +3014,7 @@ async function handleEmissionDownload(event) {
       return;
     }
 
-    const filters = {
-      pollutant: selectedPollutant,
-      mainCategory,
-      sector,
-      year,
-      category,
-      subjects,
-      scale
-    };
-
-    const response = await fetch(`${API_BASE_URL}/api/downloads/emission/batch`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      },
-      credentials: "include",
-      body: JSON.stringify(filters)
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || '下载失败');
-    }
-
-    const contentDisposition = response.headers.get('Content-Disposition');
-    const filename = contentDisposition
-      ? decodeURIComponent(contentDisposition.split('filename=')[1].replace(/"/g, ''))
-      : `emission_${year}_${category}.zip`;
-
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-
-    const fileCount = response.headers.get('X-File-Count') || '若干';
-    showMatchResult(`找到 ${fileCount} 个符合条件的文件，下载已开始`, 'success');
-    renderDownloadHistory();
+    throw new Error('未找到与当前筛选条件匹配的 Zenodo 文件，请调整年份、时间尺度或月份后重试。');
 
   } catch (error) {
     showMatchResult(`下载失败：${error.message}`, 'error');
@@ -3178,13 +3142,15 @@ async function handleOtherEmissionDownload(event, formData) {
     const originalText = btn.textContent;
     btn.textContent = '正在打开 Zenodo...';
     btn.disabled = true;
+    const popup = createPendingDownloadWindow();
 
     try {
       await recordExpressDeliveryDownloadRequest();
-      window.open(EXPRESS_DELIVERY_ZENODO_FILE.zenodoUrl, "_blank", "noopener");
+      navigateDownloadWindow(popup, EXPRESS_DELIVERY_ZENODO_FILE.zenodoUrl);
       showMatchResult("已记录下载申请，正在打开快递业道路尺度排放清单 zip 数据包。", "success");
       renderDownloadHistory();
     } catch (error) {
+      if (popup && !popup.closed) popup.close();
       showMatchResult(`下载失败：${error.message}`, 'error');
     } finally {
       btn.textContent = originalText;
@@ -3312,6 +3278,29 @@ function showMatchResult(message, type = 'info') {
   setTimeout(() => {
     resultDiv.classList.remove('show');
   }, 3000);
+}
+
+function openDownloadWindow(url) {
+  const popup = window.open("about:blank", "_blank", "noopener");
+  if (popup) {
+    popup.location.href = url;
+    return true;
+  }
+
+  window.location.href = url;
+  return false;
+}
+
+function createPendingDownloadWindow() {
+  return window.open("about:blank", "_blank");
+}
+
+function navigateDownloadWindow(popup, url) {
+  if (popup && !popup.closed) {
+    popup.location.href = url;
+    return true;
+  }
+  return openDownloadWindow(url);
 }
 
 function buildDownloadCenterUrlFromInventory(button) {
@@ -4316,6 +4305,20 @@ async function revealAdminLink() {
   const link = document.getElementById("navAdmin");
   if (!link) return;
   const token = getAuthToken();
+  const isAdminPage = document.body?.dataset?.page === "admin";
+
+  let cachedUser = null;
+  try {
+    cachedUser = JSON.parse(localStorage.getItem("currentUser") || "null");
+  } catch (error) {
+    cachedUser = null;
+  }
+
+  if (cachedUser && cachedUser.role === "admin") {
+    link.style.display = "inline-flex";
+  }
+
+  if (!token && !isAdminPage) return;
 
   try {
     const response = await fetch(`${API_BASE_URL}/api/auth/profile`, {
