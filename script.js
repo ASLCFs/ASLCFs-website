@@ -2482,6 +2482,7 @@ function initializeDownloadsPage() {
   const sectorOptions = document.getElementById('sectorOptions');
   const categorySection = document.getElementById('categorySection');
   const categoryOptions = document.getElementById('categoryOptions');
+  const scaleSection = document.getElementById('scaleSection');
   const categoryTime = document.getElementById('categoryTime');
   const categorySpecies = document.getElementById('categorySpecies');
   const timeSubjectSection = document.getElementById('timeSubjectSection');
@@ -2523,6 +2524,20 @@ function initializeDownloadsPage() {
       }
     });
     if (yearSection) yearSection.style.display = "";
+  };
+
+  const updateDownloadScaleOptions = (mainCategory) => {
+    const scaleInputs = document.querySelectorAll('input[name="scale"]');
+    const annualOnly = mainCategory === "CH4排放清单" || mainCategory === "HONO排放清单";
+    scaleInputs.forEach(input => {
+      if (annualOnly) {
+        input.checked = input.value === "annual";
+        input.disabled = input.value !== "annual";
+      } else {
+        input.disabled = false;
+      }
+    });
+    if (scaleSection) scaleSection.style.display = mainCategory === "HONO排放清单" ? "none" : "";
   };
 
   const updateDownloadDatasetMode = () => {
@@ -4807,5 +4822,4 @@ function initializeInventoryAdmin() {
     if (ok) loadInventories();
   });
 }
-
 
