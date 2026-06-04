@@ -4240,9 +4240,31 @@ async function renderDownloadHistory() {
 
 function initializeDownloadHistory() {
   const refreshButton = document.getElementById("refreshDownloadHistory");
+  const toggleButton = document.getElementById("toggleDownloadHistory");
+  const historyPanel = document.getElementById("downloadHistoryPanel");
+  const historyBody = document.getElementById("downloadHistoryBody");
+
+  const setHistoryExpanded = (expanded) => {
+    if (historyPanel) historyPanel.classList.toggle("is-collapsed", !expanded);
+    if (historyBody) historyBody.hidden = !expanded;
+    if (toggleButton) {
+      toggleButton.setAttribute("aria-expanded", expanded ? "true" : "false");
+      toggleButton.textContent = currentLanguage === "zh"
+        ? (expanded ? "收起" : "展开")
+        : (expanded ? "Collapse" : "Expand");
+    }
+  };
+
+  if (toggleButton) {
+    toggleButton.addEventListener("click", () => {
+      setHistoryExpanded(toggleButton.getAttribute("aria-expanded") !== "true");
+    });
+  }
+
   if (refreshButton) {
     refreshButton.addEventListener("click", renderDownloadHistory);
   }
+  setHistoryExpanded(false);
   renderDownloadHistory();
 }
 

@@ -11,8 +11,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" />
 
-  <link rel="stylesheet" href="styles-modern.css?v=20260604resource-title" />
-  <script src="script.js?v=20260604resource-title" defer></script>
+  <link rel="stylesheet" href="styles-modern.css?v=20260604history-collapse" />
+  <script src="script.js?v=20260604history-collapse" defer></script>
 </head>
 <body data-page="resources">
   <div class="page-shell">
@@ -132,15 +132,19 @@
             </div>
           </div>
 
-          <section class="download-history-panel" id="downloadHistoryPanel">
+          <section class="download-history-panel is-collapsed" id="downloadHistoryPanel">
             <div class="download-history-head">
               <div>
                 <h2 id="downloadHistoryTitle">下载历史</h2>
                 <p id="downloadHistoryText">展示当前登录账号最近的数据下载记录。</p>
               </div>
-              <button type="button" class="button secondary" id="refreshDownloadHistory">刷新</button>
+              <div class="download-history-actions">
+                <button type="button" class="button secondary" id="refreshDownloadHistory">刷新</button>
+                <button type="button" class="button secondary download-history-toggle" id="toggleDownloadHistory" aria-expanded="false" aria-controls="downloadHistoryBody">展开</button>
+              </div>
             </div>
-            <div class="download-history-table-wrap">
+            <div class="download-history-body" id="downloadHistoryBody" hidden>
+              <div class="download-history-table-wrap">
               <table class="download-history-table">
                 <thead>
                   <tr>
@@ -160,6 +164,7 @@
                   <tr><td colspan="10">登录后可查看下载历史。</td></tr>
                 </tbody>
               </table>
+              </div>
             </div>
           </section>
         </div>

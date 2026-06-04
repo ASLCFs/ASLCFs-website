@@ -2039,6 +2039,10 @@ body[data-page="about"] .content-section:first-of-type .section-header p {
   border-bottom: 1px solid #e5e7eb;
 }
 
+.download-history-panel.is-collapsed .download-history-head {
+  border-bottom: 0;
+}
+
 .download-history-head h2 {
   margin: 0;
   color: #111827;
@@ -2050,6 +2054,21 @@ body[data-page="about"] .content-section:first-of-type .section-header p {
   margin: 6px 0 0;
   color: #6b7280;
   font-size: 13px;
+}
+
+.download-history-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.download-history-toggle {
+  min-width: 76px;
+}
+
+.download-history-body[hidden] {
+  display: none;
 }
 
 .download-history-table-wrap {
