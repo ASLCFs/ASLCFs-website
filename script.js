@@ -3206,55 +3206,106 @@ async function handleOtherEmissionDownload(event, formData) {
   btn.disabled = true;
 
   try {
-    const token = getAuthToken();
-    const response = await fetch(`${API_BASE_URL}/api/downloads/other/batch`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      },
-      credentials: "include",
-      body: JSON.stringify({
-        datasetKey: 'other_emission',
-        datasetName: '其他排放清单',
-        mainCategory,
-        subject: '乘用车',
-        pollutants,
-        year,
-        periods,
-        scale: 'monthly'
-      })
-    });
+    const matches = await findZenodoPassengerCarFiles({ pollutants, year, periods });
+    const expectedCount = pollutants.length * periods.length;
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || '下载失败');
+    if (matches.length !== expectedCount) {
+      const foundKeys = new Set(matches.map(file => `${file.pollutant}-${getZenodoFilePeriod(file)}`));
+      const missing = [];
+      pollutants.forEach(pollutant => {
+        periods.forEach(period => {
+          const key = `${pollutant}-${period}`;
+          if (!foundKeys.has(key)) missing.push(`${pollutant} ${Number(period)}月`);
+        });
+      });
+      throw new Error(`未找到匹配的 Zenodo 文件：${missing.join('、')}`);
     }
 
-    const contentDisposition = response.headers.get('Content-Disposition');
-    const filename = contentDisposition
-      ? decodeURIComponent(contentDisposition.split('filename=')[1].replace(/"/g, ''))
-      : `other_emission_${year}.zip`;
+    const popup = matches.length === 1
+      ? createPendingDownloadWindow(matches[0].zenodoUrl, matches[0].filename)
+      : createPendingDownloadListWindow(matches);
 
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    try {
+      for (const file of matches) {
+        await recordZenodoDownloadRequest(file, {
+          datasetKey: 'other_emission',
+          datasetName: '其他排放清单',
+          mainCategory,
+          sector: '乘用车',
+          category: '乘用车日尺度排放清单',
+          subjects: [file.pollutant],
+          year,
+          scale: 'monthly',
+          period: getZenodoFilePeriod(file),
+          pollutants,
+          periods
+        });
+      }
 
-    const fileCount = response.headers.get('X-File-Count') || '若干';
-    showMatchResult(`找到 ${fileCount} 个符合条件的文件，下载已开始`, 'success');
-    renderDownloadHistory();
+      if (matches.length === 1) {
+        navigateDownloadWindow(popup, matches[0].zenodoUrl);
+        showMatchResult(`已记录下载申请，正在打开 Zenodo 文件：${matches[0].filename}`, 'success');
+      } else {
+        showDownloadListWindowReady(popup, matches);
+        showMatchResult(`已记录 ${matches.length} 个下载申请，请在新窗口逐个打开 Zenodo 链接。`, 'success');
+      }
+      renderDownloadHistory();
+    } catch (error) {
+      if (isDownloadRecordNetworkError(error)) {
+        if (matches.length === 1) {
+          navigateDownloadWindow(popup, matches[0].zenodoUrl);
+          showMatchResult(`下载记录接口暂时不可用，已打开 Zenodo 文件：${matches[0].filename}`, 'warning');
+        } else {
+          showDownloadListWindowReady(popup, matches);
+          showMatchResult(`下载记录接口暂时不可用，请在新窗口逐个打开 ${matches.length} 个 Zenodo 链接。`, 'warning');
+        }
+        return;
+      }
+
+      if (matches.length === 1) {
+        showDownloadWindowError(popup, error.message, matches[0].zenodoUrl, matches[0].filename);
+      } else {
+        showDownloadListWindowError(popup, error.message, matches);
+      }
+      throw error;
+    }
   } catch (error) {
     showMatchResult(`下载失败：${error.message}`, 'error');
   } finally {
     btn.textContent = originalText;
     btn.disabled = false;
   }
+}
+
+async function findZenodoPassengerCarFiles({ pollutants, year, periods }) {
+  const items = await loadZenodoFileIndex();
+  const matches = [];
+
+  pollutants.forEach(pollutant => {
+    periods.forEach(period => {
+      const matched = items.find(item => {
+        const relativePath = String(item.relativePath || "");
+        return item.pollutant === pollutant
+          && item.mainCategory === "乘用车日尺度排放清单"
+          && item.year === year
+          && item.scale === "monthly"
+          && getZenodoFilePeriod(item) === period
+          && relativePath.includes(`/乘用车排放清单/${pollutant}/`);
+      }) || items.find(item => {
+        const relativePath = String(item.relativePath || "");
+        return item.pollutant === pollutant
+          && item.year === year
+          && item.scale === "monthly"
+          && getZenodoFilePeriod(item) === period
+          && relativePath.includes(`/${pollutant}/`)
+          && String(item.filename || "").includes(`emission_${year}-${period}_monthly.tif`);
+      });
+
+      if (matched) matches.push(matched);
+    });
+  });
+
+  return matches;
 }
 
 async function downloadWithAuth(url, fallbackFilename) {
@@ -3465,6 +3516,100 @@ function showDownloadWindowError(popup, message, url, filename) {
     message: message || "记录下载申请时出现问题，请回到网站页面检查登录状态后重试。",
     url,
     filename,
+    status: "error"
+  });
+}
+
+function buildDownloadListHtml(files) {
+  return files.map((file, index) => {
+    const url = escapeDownloadWindowHtml(file.zenodoUrl);
+    const filename = escapeDownloadWindowHtml(file.filename || file.uploadedFilename || `Zenodo file ${index + 1}`);
+    const labelParts = [
+      file.pollutant,
+      file.year,
+      getZenodoFilePeriod(file) ? `${Number(getZenodoFilePeriod(file))}月` : ""
+    ].filter(Boolean);
+    const label = escapeDownloadWindowHtml(labelParts.join(" / ") || `文件 ${index + 1}`);
+    return `<li><span>${label}</span><a class="primary" href="${url}" rel="noopener">打开</a><div class="file">${filename}</div></li>`;
+  }).join("");
+}
+
+function writeDownloadListWindowContent(popup, { title, message, files, status = "pending" }) {
+  if (!popup || popup.closed) return false;
+
+  const safeTitle = escapeDownloadWindowHtml(title);
+  const safeMessage = escapeDownloadWindowHtml(message);
+  const safeReturnUrl = escapeDownloadWindowHtml(new URL("downloads.html", window.location.href).href);
+  const statusText = status === "error" ? "下载准备失败" : "正在准备下载";
+  const listHtml = buildDownloadListHtml(files);
+
+  try {
+    popup.document.open();
+    popup.document.write(`<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${safeTitle}</title>
+  <style>
+    body { margin: 0; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; color: #1f2933; background: #f6f8fb; }
+    main { width: min(760px, calc(100vw - 32px)); margin: 48px auto; padding: 32px; border: 1px solid #d8e0ea; border-radius: 8px; background: #fff; box-shadow: 0 16px 40px rgba(31, 41, 51, 0.08); }
+    h1 { margin: 0 0 12px; font-size: 22px; font-weight: 650; }
+    p { margin: 0 0 14px; line-height: 1.7; color: #52606d; }
+    ul { padding: 0; margin: 22px 0; list-style: none; display: grid; gap: 12px; }
+    li { padding: 14px; border: 1px solid #d8e0ea; border-radius: 8px; background: #fbfdff; }
+    li > span { display: inline-block; min-width: 160px; font-weight: 650; color: #243b53; }
+    .file { margin-top: 10px; padding: 10px 12px; border-radius: 6px; background: #f0f4f8; color: #52606d; word-break: break-all; font-size: 13px; }
+    a { display: inline-flex; align-items: center; justify-content: center; min-height: 38px; padding: 0 14px; border-radius: 6px; color: #0b5cab; background: #e7f0fb; font-weight: 650; text-decoration: none; }
+    a:hover { background: #d8e8fa; }
+    .primary { color: #fff; background: #0b5cab; }
+    .primary:hover { background: #084b8f; }
+    .status { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 18px; color: ${status === "error" ? "#b42318" : "#0967d2"}; font-size: 14px; font-weight: 650; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="status"><span class="dot"></span>${escapeDownloadWindowHtml(statusText)}</div>
+    <h1>${safeTitle}</h1>
+    <p>${safeMessage}</p>
+    <ul>${listHtml}</ul>
+    <p>下载完成后请关闭此页面返回 ASLCFs 网站。</p>
+    <div class="actions"><a href="${safeReturnUrl}">返回下载中心</a></div>
+  </main>
+</body>
+</html>`);
+    popup.document.close();
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+function createPendingDownloadListWindow(files) {
+  const popup = window.open("about:blank", "_blank");
+  writeDownloadListWindowContent(popup, {
+    title: "正在准备多个 Zenodo 下载",
+    message: "系统正在记录下载申请，完成后请在此页面逐个打开 Zenodo 链接。",
+    files
+  });
+  return popup;
+}
+
+function showDownloadListWindowReady(popup, files) {
+  writeDownloadListWindowContent(popup, {
+    title: "Zenodo 下载链接已准备好",
+    message: "请按需逐个打开下方 Zenodo 链接下载文件。",
+    files
+  });
+}
+
+function showDownloadListWindowError(popup, message, files) {
+  writeDownloadListWindowContent(popup, {
+    title: "下载准备失败",
+    message: message || "记录下载申请时出现问题，请回到网站页面检查登录状态后重试。",
+    files,
     status: "error"
   });
 }
