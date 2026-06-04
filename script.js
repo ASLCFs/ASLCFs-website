@@ -5073,6 +5073,11 @@ async function handleLogin(event) {
   try {
     const data = await requestJson(LOGIN_URL, { username, password });
 
+    const token = data?.token || data?.data?.token;
+    if (token) {
+      localStorage.setItem("authToken", token);
+    }
+
     if (data && data.user) {
       localStorage.setItem("currentUser", JSON.stringify(data.user));
     }
