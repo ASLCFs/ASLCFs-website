@@ -1769,6 +1769,42 @@ body[data-page="about"] .content-section:first-of-type .section-header p {
   color: #94a3b8 !important;
 }
 
+.inventory-menu > .inventory-menu-group {
+  display: block;
+  margin: 4px 0 8px;
+  padding: 0 4px 2px !important;
+  color: #64748b;
+  font-size: 11px !important;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.inventory-menu-level-1 {
+  min-height: 42px;
+  margin: 2px 0 4px;
+  padding: 8px 34px 8px 14px !important;
+  border: 1px solid transparent;
+  background: rgba(248, 250, 252, 0.82);
+}
+
+.inventory-menu-level-1:hover,
+.inventory-menu-level-1.has-active-descendant {
+  border-color: rgba(13, 148, 136, 0.16);
+  background: rgba(240, 253, 250, 0.72);
+}
+
+.inventory-menu-level-1.active {
+  border-color: rgba(13, 148, 136, 0.26);
+  background: rgba(240, 253, 250, 0.88);
+  box-shadow: inset 3px 0 0 #0f766e, 0 8px 18px rgba(15, 118, 110, 0.08);
+}
+
+.inventory-menu-level-1.inventory-menu-parent::after {
+  right: 14px;
+}
+
 .inventory-table-head {
   display: grid;
   grid-template-columns: minmax(180px, 1fr) minmax(0, 2fr);
