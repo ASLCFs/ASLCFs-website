@@ -906,9 +906,11 @@ const rasterInventoryConfig = {
 
 const rasterInventoryState = {
   items: [],
+  allItems: [],
   filteredItems: [],
   page: 1,
   dynamicLoaded: false,
+  zenodoBackedOnly: false,
   sidebarMainCategory: "",
   sidebarSector: "",
   sidebarCategory: "",
@@ -1197,7 +1199,7 @@ function updateDownloadStats() {
   const statsTotalSize = document.getElementById("statsTotalSize");
   const statsLastUpdate = document.getElementById("statsLastUpdate");
   const statsTotalDownloads = document.getElementById("statsTotalDownloads");
-  const items = rasterInventoryState.items.length ? rasterInventoryState.items : createRasterInventoryItems();
+  const items = getRasterInventoryDisplayItems();
   const totalSize = items.reduce((sum, item) => sum + Number(item.size || 0), 0);
   const totalDownloads = items.reduce((sum, item) => sum + getInventoryDownloadCount(item), 0);
   const lastUpdate = items
@@ -1816,6 +1818,34 @@ function createHonoInventoryItems() {
   }];
 }
 
+function createExpressDeliveryInventoryItems() {
+  return [{
+    id: "express-delivery-road-zip",
+    dataType: "emission",
+    datasetKey: EXPRESS_DELIVERY_ZENODO_FILE.datasetKey,
+    datasetName: EXPRESS_DELIVERY_ZENODO_FILE.datasetName,
+    name: EXPRESS_DELIVERY_ZENODO_FILE.filename,
+    year: "",
+    mainCategory: EXPRESS_DELIVERY_ZENODO_FILE.mainCategory,
+    sector: "快递业",
+    category: "道路尺度排放清单",
+    subCategory: "快递业",
+    pollutant: "",
+    subject: EXPRESS_DELIVERY_ZENODO_FILE.subject,
+    period: "",
+    scale: EXPRESS_DELIVERY_ZENODO_FILE.scale,
+    extension: "ZIP",
+    path: EXPRESS_DELIVERY_ZENODO_FILE.zenodoUrl,
+    size: 0,
+    createdAt: "2026-06-03",
+    updatedAt: "2026-06-03",
+    downloadCount: 0,
+    source: "zenodo",
+    zenodoUrl: EXPRESS_DELIVERY_ZENODO_FILE.zenodoUrl,
+    recordId: 20528292
+  }];
+}
+
 function createRasterInventoryItems() {
   return [
     ...createRasterInventoryItemsForPollutant("NH3", "NH3排放清单"),
@@ -1823,7 +1853,8 @@ function createRasterInventoryItems() {
     ...createMethaneSourceInventoryItems(),
     ...createRasterInventoryItemsForPollutant("NOx", "NOx排放清单"),
     ...createHonoInventoryItems(),
-    ...createPassengerCarInventoryItems()
+    ...createPassengerCarInventoryItems(),
+    ...createExpressDeliveryInventoryItems()
   ];
 }
 
@@ -1885,7 +1916,7 @@ function mergeRasterInventoryItems(staticItems, dynamicItems) {
 }
 
 function getRasterInventoryOptionData() {
-  const items = rasterInventoryState.items.length ? rasterInventoryState.items : createRasterInventoryItems();
+  const items = getRasterInventoryDisplayItems();
   const years = Array.from(new Set(items.map(item => item.year).filter(Boolean)))
     .sort((a, b) => Number(a) - Number(b));
   const datasets = Array.from(new Map(items
@@ -1984,6 +2015,11 @@ function getPollutantFromMainCategory(mainCategory = "NH3排放清单") {
   return "NH3";
 }
 
+function getRasterInventoryDisplayItems() {
+  if (rasterInventoryState.zenodoBackedOnly) return rasterInventoryState.items;
+  return rasterInventoryState.items.length ? rasterInventoryState.items : rasterInventoryState.allItems;
+}
+
 function buildEmissionFileDownloadUrl({ pollutant = "NH3", sector = "", year, category, subject, scale, filename }) {
   const params = new URLSearchParams({
     pollutant: String(pollutant || 'NH3'),
@@ -2010,6 +2046,85 @@ function formatInventoryDate(item) {
 
 function getInventoryDownloadCount(item) {
   return Number.isFinite(Number(item.downloadCount)) ? Number(item.downloadCount) : 0;
+}
+
+function getInventoryItemSubjectAliases(subject) {
+  const value = String(subject || "");
+  if (value === "甲烷总排放量") return ["甲烷总排放量", "总排放量"];
+  if (value === "总排放量") return ["总排放量", "甲烷总排放量"];
+  return [value];
+}
+
+function getInventoryItemPeriod(item) {
+  if (item.scale !== "monthly") return "";
+  if (/^(0[1-9]|1[0-2])$/.test(String(item.period || ""))) return String(item.period);
+
+  const text = `${item.name || ""}/${item.path || ""}`;
+  const year = String(item.year || "");
+  const pattern = new RegExp(`(?:^|[^0-9])${year}[_-](0[1-9]|1[0-2])(?:[^0-9]|$)`);
+  const matched = text.match(pattern);
+  return matched ? matched[1] : "";
+}
+
+function getZenodoBackingFileForInventoryItem(item, zenodoItems) {
+  if (item.mainCategory === EXPRESS_DELIVERY_ZENODO_FILE.mainCategory) {
+    return EXPRESS_DELIVERY_ZENODO_FILE;
+  }
+
+  if (!Array.isArray(zenodoItems) || !zenodoItems.length) return false;
+  const itemPeriod = getInventoryItemPeriod(item);
+  const subjects = getInventoryItemSubjectAliases(item.subject);
+
+  return zenodoItems.find(file => {
+    const sameYear = String(file.year || "") === String(item.year || "");
+    const sameScale = String(file.scale || "") === String(item.scale || "");
+    const samePeriod = item.scale !== "monthly" || getZenodoFilePeriod(file) === itemPeriod;
+    const samePollutant = !item.pollutant || String(file.pollutant || "") === String(item.pollutant || "");
+    const sameMainCategory = !item.mainCategory || String(file.mainCategory || "") === String(item.mainCategory || "");
+    const sameSector = !item.sector || !file.sector || String(file.sector || "") === String(item.sector || "");
+    const sameCategory = !item.category || !file.category || String(file.category || "") === String(item.category || "");
+    const sameSubject = !item.subject || !file.subject || subjects.includes(String(file.subject || ""));
+    const relativePath = String(file.relativePath || "");
+
+    const passengerCarMatch = item.mainCategory === "乘用车日尺度排放清单"
+      && file.mainCategory === "乘用车日尺度排放清单"
+      && sameYear
+      && sameScale
+      && samePeriod
+      && samePollutant
+      && relativePath.includes(`/乘用车排放清单/${item.pollutant}/`);
+
+    if (passengerCarMatch) return true;
+
+    return sameYear
+      && sameScale
+      && samePeriod
+      && samePollutant
+      && sameMainCategory
+      && sameSector
+      && sameCategory
+      && sameSubject;
+  });
+}
+
+function filterZenodoBackedInventoryItems(items, zenodoItems) {
+  return items
+    .map(item => {
+      const zenodoFile = getZenodoBackingFileForInventoryItem(item, zenodoItems);
+      if (!zenodoFile) return null;
+
+      return {
+        ...item,
+        name: zenodoFile.filename || item.name,
+        path: zenodoFile.zenodoUrl || item.path,
+        size: zenodoFile.size || item.size,
+        zenodoUrl: zenodoFile.zenodoUrl,
+        uploadedFilename: zenodoFile.uploadedFilename,
+        recordId: zenodoFile.recordId,
+        source: "zenodo"
+      };
+    })
+    .filter(Boolean);
 }
 
 function formatDatasetTypeLabel(dataType) {
@@ -2149,6 +2264,9 @@ function formatRasterCategory(category) {
 
 function formatRasterPeriod(item) {
   const text = getRasterTexts();
+  if (item.scale === "zip") {
+    return currentLanguage === "zh" ? "ZIP 数据包" : "ZIP Package";
+  }
   if (item.scale === "annual") {
     return text.scaleAnnual;
   }
@@ -2162,6 +2280,7 @@ function formatInventoryScale(item) {
   if (item.scale === "monthly") return formatRasterPeriod(item);
   if (item.scale === "daily") return currentLanguage === "zh" ? "日尺度" : "Daily";
   if (item.scale === "hourly") return currentLanguage === "zh" ? "小时尺度" : "Hourly";
+  if (item.scale === "zip") return currentLanguage === "zh" ? "ZIP 数据包" : "ZIP Package";
   if (item.scale === "other") return currentLanguage === "zh" ? "其他" : "Other";
   return item.scale || "-";
 }
@@ -2337,7 +2456,7 @@ function renderRasterInventory() {
   const container = document.getElementById("rasterList");
   if (!container) return;
 
-  if (!rasterInventoryState.items.length) {
+  if (!rasterInventoryState.items.length && !rasterInventoryState.allItems.length && !rasterInventoryState.zenodoBackedOnly) {
     rasterInventoryState.items = createRasterInventoryItems();
   }
 
@@ -2347,7 +2466,8 @@ function renderRasterInventory() {
   const categoryOrder = { "时间分解": 0, "物种分解": 1, "作物分解": 2, "甲烷来源分解": 3, "污染物分解": 4 };
   const optionData = getRasterInventoryOptionData();
 
-  const filtered = rasterInventoryState.items.filter((item) => {
+  const inventoryItems = getRasterInventoryDisplayItems();
+  const filtered = inventoryItems.filter((item) => {
     if (filters.year && item.year !== filters.year) return false;
     if (filters.datasetKey && !getEquivalentDatasetKeys(filters.datasetKey).includes(item.datasetKey)) return false;
     if (filters.mainCategory && item.mainCategory !== filters.mainCategory) return false;
@@ -3688,23 +3808,36 @@ function initializeRasterInventory() {
   if (!container) return;
 
   const staticItems = createRasterInventoryItems();
-  rasterInventoryState.items = staticItems;
-  updateRasterInventoryCopy();
-  renderRasterInventory();
-  updateDownloadStats();
+  rasterInventoryState.allItems = staticItems;
 
-  loadPublishedInventories()
-    .then((dynamicItems) => {
+  (async () => {
+    try {
+      const zenodoItems = await loadZenodoFileIndex();
+      rasterInventoryState.items = filterZenodoBackedInventoryItems(staticItems, zenodoItems);
+      rasterInventoryState.zenodoBackedOnly = true;
+      updateRasterInventoryCopy();
+      renderRasterInventory();
+      updateDownloadStats();
+
+      const dynamicItems = await loadPublishedInventories().catch(() => []);
       if (!dynamicItems.length) return;
-      rasterInventoryState.items = mergeRasterInventoryItems(staticItems, dynamicItems);
+
+      const mergedItems = mergeRasterInventoryItems(staticItems, dynamicItems);
+      rasterInventoryState.allItems = mergedItems;
+      rasterInventoryState.items = filterZenodoBackedInventoryItems(mergedItems, zenodoItems);
       rasterInventoryState.dynamicLoaded = true;
       updateRasterInventoryCopy();
       renderRasterInventory();
       updateDownloadStats();
-    })
-    .catch(() => {
+    } catch (error) {
+      rasterInventoryState.items = [];
+      rasterInventoryState.zenodoBackedOnly = true;
+      updateRasterInventoryCopy();
+      renderRasterInventory();
+      updateDownloadStats();
       rasterInventoryState.dynamicLoaded = false;
-    });
+    }
+  })();
 
   const yearFilter = document.getElementById("rasterYearFilter");
   const datasetFilter = document.getElementById("rasterDatasetFilter");
