@@ -4258,33 +4258,54 @@ async function updateVisitStats() {
   const visitCount = document.getElementById("visitCount");
   if (!visitCount) return;
 
-  visitCount.textContent = VISIT_BASE_COUNT.toLocaleString();
   const visitRecordedKey = "aslcfs_visit_recorded";
+  const visitorIdKey = "aslcfs_visitor_id";
   const hasRecordedVisit = sessionStorage.getItem(visitRecordedKey) === "true";
+  let visitorId = localStorage.getItem(visitorIdKey);
+
+  if (!visitorId) {
+    visitorId = `v_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem(visitorIdKey, visitorId);
+  }
+
+  const renderCount = (value) => {
+    const total = Number(value);
+    if (Number.isFinite(total) && total > 0) {
+      visitCount.textContent = total.toLocaleString();
+    }
+  };
+
+  visitCount.textContent = visitCount.textContent.trim() || "--";
 
   try {
-    const response = hasRecordedVisit
-      ? await fetch(`${API_BASE_URL}/api/analytics/visit-count`, {
-        credentials: "include"
-      })
-      : await fetch(`${API_BASE_URL}/api/analytics/visit`, {
+    const countResponse = await fetch(`${API_BASE_URL}/api/analytics/visit-count`, {
+      credentials: "include"
+    });
+
+    if (!countResponse.ok) throw new Error("Failed to load visit count");
+
+    const countData = await countResponse.json();
+    renderCount(countData.totalCount || VISIT_BASE_COUNT);
+
+    if (hasRecordedVisit) return;
+
+    const visitResponse = await fetch(`${API_BASE_URL}/api/analytics/visit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
           page: document.body?.dataset?.page || "",
           path: window.location.pathname,
-          referrer: document.referrer || ""
+          referrer: document.referrer || "",
+          visitorId
         })
       });
 
-    if (!response.ok) throw new Error("Failed to record visit");
+    if (!visitResponse.ok) throw new Error("Failed to record visit");
 
-    const data = await response.json();
-    visitCount.textContent = Number(data.totalCount || VISIT_BASE_COUNT).toLocaleString();
-    if (!hasRecordedVisit) {
-      sessionStorage.setItem(visitRecordedKey, "true");
-    }
+    const visitData = await visitResponse.json();
+    renderCount(visitData.totalCount || countData.totalCount || VISIT_BASE_COUNT);
+    sessionStorage.setItem(visitRecordedKey, "true");
   } catch (error) {
     try {
       const response = await fetch(`${API_BASE_URL}/api/analytics/visit-count`, {
@@ -4292,9 +4313,9 @@ async function updateVisitStats() {
       });
       if (!response.ok) throw new Error("Failed to load visit count");
       const data = await response.json();
-      visitCount.textContent = Number(data.totalCount || VISIT_BASE_COUNT).toLocaleString();
+      renderCount(data.totalCount || VISIT_BASE_COUNT);
     } catch (fallbackError) {
-      visitCount.textContent = VISIT_BASE_COUNT.toLocaleString();
+      renderCount(visitCount.textContent || VISIT_BASE_COUNT);
     }
   }
 }
