@@ -1356,7 +1356,7 @@ function getRasterTexts() {
       datasetHeader: "数据集",
       yearHeader: "年份",
       scaleHeader: "时间尺度",
-      filenameHeader: "文件名",
+      filenameHeader: "sub_source",
       formatHeader: "格式",
       actionHeader: "操作",
       sidebarTitle: "清单列表",
@@ -1436,7 +1436,7 @@ function getRasterTexts() {
     datasetHeader: "Dataset",
     yearHeader: "Year",
     scaleHeader: "Time Scale",
-    filenameHeader: "Filename",
+    filenameHeader: "sub_source",
     formatHeader: "Format",
     actionHeader: "Action",
     sidebarTitle: "Inventory List",
@@ -2249,6 +2249,51 @@ function formatRasterSubject(subject) {
   return subject || "-";
 }
 
+function getInventorySubSourceLabel(item) {
+  const subjectMap = {
+    livestock: "Livestock",
+    crop: "Crop cultivation",
+    "甲烷总排放量": "Total CH4 emissions",
+    "总排放量": "Total CH4 emissions",
+    "水稻种植": "Rice cultivation",
+    "粪便管理": "Manure management",
+    "肠道发酵": "Enteric fermentation",
+    "水稻": "Rice",
+    "小麦": "Wheat",
+    "玉米": "Maize",
+    "其他作物": "Other crops",
+    "猪": "Swine",
+    "牛": "Cattle",
+    "奶牛": "Dairy cattle",
+    "羊": "Sheep and goats",
+    "家禽": "Poultry",
+    "其他": "Other livestock",
+    "乘用车": "Passenger car",
+    "快递业": "Express delivery",
+    HONO: "HONO"
+  };
+
+  if (item.mainCategory === "快递业道路尺度排放清单") {
+    return "Express delivery_Road-scale inventory";
+  }
+
+  if (item.mainCategory === "乘用车日尺度排放清单") {
+    return `Passenger car_${item.pollutant || "Inventory"}`;
+  }
+
+  if (item.mainCategory === "HONO排放清单") {
+    return "HONO_2016";
+  }
+
+  const pollutant = item.pollutant || getPollutantFromMainCategory(item.mainCategory);
+  const source = subjectMap[item.subject]
+    || subjectMap[item.sector]
+    || subjectMap[item.category]
+    || String(item.subject || item.sector || item.category || "Inventory");
+
+  return `${pollutant}_${source}`;
+}
+
 function formatRasterCategory(category) {
   const text = getRasterTexts();
   if (category === "时间分解" || category === "时间") return text.categoryTime;
@@ -2302,6 +2347,7 @@ function matchesInventoryKeyword(item, keyword) {
     item.pollutant,
     item.subject,
     item.pollutant,
+    getInventorySubSourceLabel(item),
     formatRasterSubject(item.subject),
     formatRasterCategory(item.category),
     formatInventoryScale(item)
@@ -2528,7 +2574,7 @@ function renderRasterInventory() {
         <td>${formatInventoryDatasetName(item.datasetKey, item.datasetName)}</td>
         <td>${item.year || "-"}</td>
         <td>${formatInventoryScale(item)}</td>
-        <td class="inventory-scenario-cell">${item.name}</td>
+        <td class="inventory-scenario-cell">${getInventorySubSourceLabel(item)}</td>
         <td>${item.extension || "TIF"}</td>
         <td>
           <div class="inventory-row-actions">
