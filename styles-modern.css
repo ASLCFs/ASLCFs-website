@@ -846,6 +846,20 @@ body.admin-nav-visible .site-nav a {
   letter-spacing: -0.02em;
 }
 
+.hero-metric strong.hero-metric-compact {
+  max-width: none;
+  font-size: 0.9rem;
+  line-height: 1.35;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .hero-metric strong.hero-metric-compact {
+    white-space: normal;
+  }
+}
+
 .hero-metric span {
   display: block;
   margin-top: 6px;
