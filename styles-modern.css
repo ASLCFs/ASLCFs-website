@@ -335,7 +335,7 @@ body.admin-nav-visible .site-nav a {
 
 .visit-stats strong {
   color: var(--text-primary);
-  font-weight: 700;
+  font-weight: 500;
   font-size: 13px;
 }
 
