@@ -927,7 +927,7 @@ const rasterInventoryState = {
   sidebarSubjects: []
 };
 
-const VISIT_BASE_COUNT = 6124;
+const VISIT_BASE_COUNT = 8213;
 const supportedLanguages = ["zh", "en"];
 let currentLanguage = "zh";
 let currentSearch = "";
